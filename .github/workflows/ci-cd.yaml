@@ -8,17 +8,6 @@ on:
 
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Prepare for tests
-        run: |
-          sudo apt update
-          sudo apt install -y python3-pip
-          pip install -r requirements.txt
-          docker build . --file Dockerfile --tag ${{secrets.DOCKER_USERNAME}}/author-service:latest
-          sleep 5
 
   build-and-push-to-docker-hub:
     name: Build and push to DockerHub
