@@ -2,6 +2,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException
 
 from . import db_manager
+from .service import is_author_present
 from .models import BookIn, BookOut, BookUpdate
 
 books = APIRouter()
@@ -10,7 +11,7 @@ books = APIRouter()
 @books.get("/", response_model=List[BookOut], status_code=200)
 async def list_book() -> dict:
     """
-    Получить все книги
+    Fetch all books
     """
     return await db_manager.get_all_books()
 
@@ -18,7 +19,7 @@ async def list_book() -> dict:
 @books.get("/{book_id}", response_model=BookOut, status_code=200)
 async def get_book(book_id: int):
     """
-    Получить одну книгу по ID
+    Fetch a single book by ID
     """
     book = await db_manager.get_book(book_id)
     if not book:
@@ -29,8 +30,13 @@ async def get_book(book_id: int):
 @books.post("/create/", response_model=BookOut, status_code=201)
 async def create_book(payload: BookIn):
     """
-    Создать книгу
+    Create a book
     """
+    for author_id in payload.authors_id:
+        if not is_author_present(author_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Author with id:{author_id} not found")
 
     book_id = await db_manager.add_book(payload)
     response = {"id": book_id, **payload.dict()}
@@ -39,15 +45,18 @@ async def create_book(payload: BookIn):
 
 @books.put("/update/{book_id}/", response_model=BookOut)
 async def update_book(book_id: int, payload: BookUpdate):
-    """
-    Обновить книгу
-    """
     book = await db_manager.get_book(book_id)
 
     if not book:
         HTTPException(status_code=404, detail="Book not found")
 
     update_data = payload.dict(exclude_unset=True)
+    if "authors_id" in update_data:
+        for author_id in payload.authors_id:
+            if not is_author_present(author_id):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Author with given id:{author_id} not found")
 
     book_id_db = BookIn(**book)
     update_book = book_id_db.copy(update=update_data)
@@ -56,9 +65,6 @@ async def update_book(book_id: int, payload: BookUpdate):
 
 @books.delete("/delete/{book_id}/", response_model=None)
 async def delete_book(book_id: int):
-    """
-    Удалить книгу
-    """
     book = await db_manager.get_book(book_id)
     if not book:
         HTTPException(status_code=404, detail="Book not found")
